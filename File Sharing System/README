@@ -1,0 +1,46 @@
+VIJAEAC CRISTIAN-OCTAVIAN 325CB
+
+--Explicatiile de mai jos si modalitatile de rezolvare se aplica implementarii fara upload si download din cadrul rezolvarii mele--
+
+1)CLIENT
+
+	Pentru construirea clientului am apelat la functii si structuri de date existente in libariile C-ului folosind protocolul TCP de transport.Intrucat clientul poate avea o singura conexiune la un anumit moment,mai exact conexiunea cu serverul,nu am considerat necesara implementarea unei comunicatii pe mai multi socketi cu serverul,asa ca am folosit un singur socket pe care se pot receptiona/transmite date(in cazul in care as fi implementat functiile de upload,download,comunicarea pe mai multi socketi era necesara).
+	--functia getName : extrage al doilea argument din mesajele primite de la server care,in general,contin numele utilizatorului care va trebui afisat la 		prompt (in cazul comenzii login)
+	--main :-in functia main se creaza socket-ul,se definesc informatiile necesare realizarii unei conexiuni cu serverul iar apoi se asteapta primirea si se face 			trimiterea de comenzi.Fiecare rezultat si fiecare comanda sunt scrise in fisierul de log asociat clientului precum si la consola acestuia
+		-mai intai se verifica daca in cazul unei comenzi de login exista alta sesiune activa,caz in care se intoarce un mesaj de eroare intrucat nu pot 			exista 2 sesiuni active la un momentdat in cadrul aceluiasi client
+		-apoi se verifica daca se vrea trimiterea unei comenzi la server atunci cand niciun user nu este autentificat,caz de eroare in care se intoarce -1 iar
+		comanda nu este trimisa la server pt a fi prelucrata
+		-daca de la consola se citeste comanda "quit",clientul este automat oprit si conexiunea inchisa
+		-daca nu se intra pe niciunul din cazurile de mai sus,se verifica mesajul de la server,iar in functie de acesta se executa o serie de 			   instructiuni (afisarea la prompt a user-ului care primeste raspunsul,afisarea la consola a rezultatului,scrierea in fisier log al rezultatului,al 			comenzii,afisarea erorilor,modificarea unor parametrii de care depinde viitoarea functionalitate,etc),iar in cazul in care se primeste un mesaj 
+		conform caruia server-ul se inchide sau au avut loc mai multe incercari repetate de login esuate (brute-force) clientul si conexiunea se inchid
+
+2)SERVER
+	Pentru construirea serverului am apelati functii si structuri de date existente in librariile C-ului folosind protocolul TCP de transport.Intrucat serverul poate avea mai multe conexiuni active cu mai multi clienti la un momentdat,a fost necesara implementarea multiplexarii folosind apelul select si listele de file descriptori.
+	--functia getName : extrage al doilea argument din comenzile primite de la clienti care,in general,contin numele utilizatorului sau numele fisierului asupra 		caruia se executa o comanda/se cer informatii
+	--functia existsUser : verifica daca un user (numele lui fiind primit ca parametru) exista in "baza de date" cu useri ai server-ului
+	--functia createUsers : construieste o structura de date care contine numele userilor si parolele asociate lor pe baza fisierului "users_config"
+	--functia existsFile : verifica daca directorul asociat unui utilizator exista(daca nu,il cream chiar noi),iar apoi se uita in director sa vada daca fisierul 		partajat pe care vrem sa-l bagam in lista noastra exista
+	--functia createFiles : construieste o lista care contine userii si fisierele partajate pe care acestia le detin.Pe baza fisierului "shared_Files" se vor 		introduce in aceasta lista doar userii care exista in "baza de date" a serverului impreuna cu fisierele care trebuie si ele sa exista in folderele asociate
+	fiecarui utilizator,iar in caz contrar se va ignora acea linie inserarea neefectuandu-se
+	--functia checkAuthentication : functia verifica credentialele primite prin comanda "login" ale unui utilizator;mai intai separa username-ul si parola din 		comanda;verifica daca user-ul exista,daca parola este corecta si apoi intoarce -3 in caz de eroare sau 1 in caz de succes(prin efect lateral,in caz de login
+	esuat,se incrementeaza si contorul care tine cont de numarul de login-uri consecutive gresite pt a putea face detectia brute-force-ului)
+	--functia login : apeleaza functia checkAuthentication si verifica daca s-au efectuat prea multe tentative de login,caz in care se returneaza codul de eroare
+	-8,daca numarul returnat de functia apelata este -3,caz in care credentialele de login au fost gresite sau daca totul a decurs bine (s-a returnat 1) ceea ce 		inseamna ca loginul a fost efectuat cu succes
+	--functia getUserList : parcurge lista de useri din structura noastra de date si intoarce numele tuturor userilor existenti pe server
+	--functia getFileList : verifica daca userul pentru care se cere lista de fisiere exista,iar daca nu se intoarce codul de eroare -11.Daca exista,se deschide
+	directorul asociat user-ului si se parcurg toate fisierele.Pentru fiecare fisier se afiseaza numele,se calculeaza dimensiunea plasand un pointer la sfarsitul
+	fisierului,iar in functie de tipul lui (1-partajat,exista in lista de fisere partajate,0-privat,nu exista in lista) se afiseaza si acesta
+	--functia share : partajeaza un fisier cu ceilalti utilizatori.Se verifica daca fisierul este deja partajat(exista in lista de fisiere partajate),caz in care
+	se intoarce mesajul de eroare -6.Daca nu este partajat,se verifica existenta lui in interiorul folderului.In cazul in care nu exista se intoarce mesajul de 		eroare -4 intrucat nu avem asupra cui sa facem partajarea,iar daca exista,fisierul va fi introdus in lista de fisisere partajate
+	--functia unshare : mai intai verificam daca exista in lista de fisiere partajate(ceea ce inseamna ca-l putem face sa fie privat).Daca exista,il stergem din
+	acea lista,tipul lui devenind 0,adica private.Daca nu exista in lista,verificam daca exista in directorul utilizatorului.Daca nu exista se intoarce mesajul de 
+	eroare -4,iar daca exista inseamna ca este deja privat si se intoarce mesajul -7
+	--functia delete : se verifica existenta fisierului in cadrul listei de fisiere partajate.Daca exista,pentru ca va fi sters fizic de pe disc-ul 	   		serverului,trebuie mai intai scos din acea lista,apoi va fi sters.Daca nu exista in lista,este cautat in directorul utilizatorului.Daca este gasit acesta se 		va sterge direct,iar daca nu inseamna ca fisierul nu exista deloc pe disc si astfel se va intoarce un mesaj de eroare : -4.
+	--main : aici se initializeaza socket-ul inactiv pe care se asculta noi conexiuni,se definesc informatiile necesare realiarii conexiunii (IP+PORT),se definesc 		multimile de file descriptori asociate socketilor pe care se vor asculta/trimite mesaje.Se initializeaza structurile de date asociate userilor si fisierelor
+	partajate.Se introduce un file descriptor particulat (0) pentru citirea din consola a serverului in cazul comenzii "quit".Mai intai se verifica daca se 
+	intalneste aceasta comanda,caz in care se inchid toate conexiunile de pe toti socketii activi si se scot file descriptorii asoctiati acestora din lista.Daca
+	nu se intalneste acest mesaj de la consola,se verifica daca a venit ceva pe socketul inactiv(o noua conexiune),moment in care se "accepta" conexiunea prin 
+	inserarea file descriptor-ului asociat noii conexiuni in lista.Daca a venit un mesaj pe oricare alt socket,mai putin cei 2 mentionati anterior,inseamna ca am
+	primit un mesaj de la client si se vor efectua o serie de instructiuni,functii,afisari,etc in functia de comanda primita.De aseamnea se vor actualiza si
+	vectorii auxiliari (vectorul care memoreaza daca si ce user este logat la un anumit moment pe un socket,vectorul care tine minte socketii cu conexiuni active,
+	contorul care detecteaza brute-force,etc)

@@ -1,0 +1,97 @@
+VIJAEAC CRISTIAN-OCTAVIAN 325CB
+
+Fisierul sursa SERVER.c
+
+	Am avut de adaptat programul pentru urmatoarele 3 moduri de functionare:
+
+1)Modul simplu-mesajele se trimit si se primesc intr-o succesiune anume
+	      -nu sunt necesare confirmari/verificari/recorectari
+	      -am facut ceea ce mi se spunea in mesajele primite
+	      -in cadrul jocului am folosti cautarea binare in functie de indiciile primite de la client pana cand intalneam succes si ajungeam la solutie(functia
+	      searchBinary() );
+	      -dupa joc ieseam din program
+
+2)Modul ack-mesajele se trimit si se asteapta ACK(confirmarea primirii mesajelor) de catre client,conexiunea dintre cei 2 reluandu-se dupa ce un mesaj de acest 
+	    tip a fost primit
+	   -mesajele primite se vor citii iar apoi se va trimite un mesaj ACK(la fel ca si mai sus) dar de data aceasta de la server la client pentru a-l anunta
+	   ca am primit mesajul
+	   -in cadrul jocului am urmatit acelasi algoritm ca mai sus doar ca atunci cand primeam mesaj-->trimiteam imediat dupa ack,iar atunci cand trimiteam         		   asteptam ack pentru urmatoarea actiune(functia searchBinaryAck() )
+
+3)Modul parity-->spre deosebire de mai sus,fiecare mesaj trimis/primit continea pe prima pozitie byteul de paritate(o valoare care reprezenta numarul de biti de unu 			din intreg stringul modulo 2)(functia checkParity() )
+  		-->cand primeam un mesaj,verificam daca byteul cu care a venit coincide cu ceea ce imi calculeaza mie functia,iar in caz contrar se trimitea un mesaj 			nack care cerea retrimiterea mesajului(functia checkMsg() )
+		-->daca erau corecte se trimitea ack si se continua primirea/trimiterea de noi mesaje
+		-->in cazul mesajelor trimise,daca atunci cand trimiteam un mesaj cu o anumita paritate,ajungea la client cu o alta paritate,clientul imi trimitea
+                un mesaj nack cerandu-mi sa-i retrimit mesajul pana cand acesta este corect(functia checkAckClient() )
+		-->la joc algoritmul este ca si in celelalte 2 cazuri cu mentiunea ca de fiecare daca cand se trimitea mesaj se verifica daca se primeste ack sau nack 
+                pentru retrimitere,iar daca se primea mesaj se verifica corectitudinea iar in caz contrar se cerea retrimitere(functia searchBinaryParity() )
+
+4)Modul hamming-->spre deosebite de celelalte moduri,fiecare octet dintr-un mesaj trimis este codificat in 2 octeti(functia codifyHamming() ) astfel incat
+                acestia contineau atat biti de paritate cat si biti de date(detalii mai jos in "Functii auxiliare");
+		-->la primire,atunci cand se primea un mesaj,se decodifica folosind functia decodifyHamming() si se obtinea structura initiala a mesajului
+		(detalii mai jos in "Functii auxiliare")	
+		-->insa aceasta putea fi gresita,asa ca se facea recorectarea folosind codurile Hamming(functia repairHamming() )
+		-->astfel,in joc(la fel ca si in afara lui) atunci cand se trimitea un mesaj mai intai se codifica,iar apoi cand se primea acesta era mai intai 		reparat si apoi decodificat!(functia searchBinaryHamming() )
+
+	Functii auxiliare:
+1)Functii care se ocupau de gasirea unei solutii a jocului folosind cautarea binara in functie de indiciile care se primeau,cautarea efectuandu-se pana 
+cand se primea un mesaj de tip "succes":
+	-functia searchBinary(msg r,msg s)-parametrii reprezinta structurile folosite pentru trimitere/primire de mesaje(r-receive,s-send)
+	-functia searchBinaryAck(msg r,msg s)-parametrii reprezinta structurile folosite pentru trimitere/primire de mesaje(r-receive,s-send)
+					     -in plus fata de cealalta functie,la primirea/trimiterea unui mesaj se trimite/primeste un mesaj
+					     de tip ack pentru confirmarea primii/trimiterii cu succes a unui mesaj
+	-functia searchBinaryParity(msg r,msg s)-parametrii reprezinta structurile folosite pentru trimitere/primire de mesaje(r-receive,s-send)
+						-spre deosebire de functiile de mai sus,tuturor mesajelor trimise li se adauga un byte de paritate pentru
+						verificarea corectitudinii(in cazul in care erau incorecte,clientul cerea retrimiterea lor),iar la mesajele primite
+						se verifica acelasi byte iar in caz de corupere se cererea retrimiterea lor de catre client
+	-functia searchBinaryHamming(msg r,msg s)-parametrii reprezinta structurile folosite pentru trimitere/primire de mesaje(r-receive,s-send)
+						 -aceasta functie codifica fiecare mesaj trimit folosind biti de paritate si de date(codul Hamming),iar atunci cand
+						se primea un mesaj acesta era verificat de corupere,iar in caz ca erau corupte se repara bitul care a fost "eronat"
+						iar apoi se decodifica mesajul obtinandu-se forma corecta a mesajului primit 
+
+2)Functia checkParity(char *m,int len)-functia aceasta primeste ca parametru un string reprezentand mesajul si lungimea acestuia
+			  	     -in decursul ei,functia ia fiecare octet din cuvant(char) si calculeaza numarul de biti de "1" din acesta,facand o suma
+				     -la final suma va reprezenta numarul de biti de "1" din tot cuvantul si facand operatia "modulo 2" se obtine valoarea
+				    "0"-numar par si "1"-numar impar
+
+3)Functia checkAckClient(msg r,msg s)-parametrii reprezinta mesajele folosite pentru receptionar/trimitere(send)
+				     -functia verifica daca mesajul primit are lungimea 5(caz in care e "NACK") ceea ce inseamna ca clientul doreste retrimiterea
+				     mesajul precedent intrucat a ajuns eronat
+				     -acest lucru se intampla pana cand dimensiunea mesajului primit este !=5 (ceea ce inseamna ca am primit ack) si mesajul a fost
+				     primit corect
+
+4)Functia checkMsg(r)-parametrul reprezinta mesajul care a fost receptionat
+		     -functia calculeaza paritatea pe care ar fi trebuit sa o aibe mesajul primit si o compara cu paritatea aflata pe primul octet
+		     -daca cele 2 valori difera,inseamna ca mesajul a fost corupt si astfel se cere retrimiterea lui printr-un mesaj de tip "nack"
+		     -procesul se repeta pana cand cele 2 valori coincid,ceea ce inseamna ca s-a primit un mesaj corect
+
+5)Functia codifyHamming(msg r,char *m,int len)-parametrii sunt:r-mesajul care trebuie trimis,m-informatia care trebuie atasat mesajului si codificata,len-dimensiunea 							acestuia
+					      -se ia fiecare octet din informatia pe care dorim sa o codificam si formam cei 2 octeti care contin informatia din 							octetul initial+biti de paritate(de aceea dimensiunea informatiei se dubleaza)
+					      -dupa codificare bitii vor avea forma: x x x x P1 P2 D1 P4 (primul octet)
+										     D2 D3 D4 P8 D5 D6 D7 D8 (al doilea octet),unde Pi bitul i de paritate iar Di 						      bitul i de date
+					      -mai intai se seteaza bitii de date in ordinea inversa(de la dreapta la stanga):D8->D7->D6->D5->D4->D3->D2->D1
+					      -se calculeaza si se seteaza in acelasi timp bitii de paritate dupa cum urmeaza:
+							-P1 va contine suma modulo 2 a valorilor bitilor D1,D2,D3,D5,D7
+							-P2 va contine suma modulo 2 a valorilor bitilor D1,D3,D4,D6,D7
+							-P4 va contine suma modulo 2 a valorilor bitilor D2,D3,D4,D8
+							-P8 va contine suma modulo 2 a valorilor bitilor D5,D6,D7,D8
+					     -se insereaza cei 2 octeti in payload-ul mesajului
+
+6)Functia decodifyHamming(char *m)-parametru-cate 2 octeti din informatia care trebuie decodificata
+				  -intoarce primul octet din informatia initiala
+				  -functia extrage,din cei 2 octeti,numai bitii de date:D1,D2,D3,D4,D5,D6,D7,D8 si ii pune intr-un char pe pozitia lor corespunzatoare
+
+7)Functia repairHamming(char *m)-parametru-cate 2 octeti din informatia care se primeste si se verifica daca trebuie reparata sau nu,iar in caz afirmativ se repara 					bitul "corupt"
+				-se calculeaza valorile pe care ar trebui sa le aibe bitii de paritate P1,P2,P4,P8 modulo 2
+				-se compara si cu valorile bitilor de paritate existente deja in cei 2 octeti
+				-daca cele 2 valori sunt egale,bitul de paritate va primii valoarea 0,iar daca nu se primeste valoarea 1
+				-se calculeaza suma P8*8+P4*4+P2*2+P1 iar in functie de valoarea acesteia determina ce biti sunt corupti
+				-daca suma=0 inseamna ca nu exista biti corupti si nu avem ce corecta
+				-daca suma=3 inseamna ca bitul D1 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=5 inseamna ca bitul D2 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=6 inseamna ca bitul D3 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=7 inseamna ca bitul D4 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=9 inseamna ca bitul D5 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=10 inseamna ca bitul D6 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=11 inseamna ca bitul D7 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-daca suma=12 inseamna ca bitul D8 este corupt si facem flip(schimbam din 0 in 1 sau din 1 in 0)
+				-in urma acestui proces bitiul de date corupt va fi corectat si mesajul va fi corect
